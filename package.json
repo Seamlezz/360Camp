@@ -2,13 +2,14 @@
   "name": "360camp",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/index.js",
+  "main": "lib/index.js",
   "typings": "src/index.d.ts",
   "scripts": {
     "lint": "eslint 'src/**/*'",
     "build": "tsc",
     "build:watch": "tsc -w && cp src/*.json lib",
-    "serve": "node ./dist/index.js",
+    "serve": "node ./lib/index.js",
+    "dev:single": "npm run build && npm run serve",
     "dev": "npm run build && concurrently \"npm run build:watch\" \"npm run serve\""
   },
   "keywords": [],
@@ -16,6 +17,7 @@
   "license": "ISC",
   "dependencies": {
     "dotenv": "^8.2.0",
+    "p-limit": "^3.0.2",
     "puppeteer": "^5.3.1",
     "string-similarity": "^4.0.2"
   },
