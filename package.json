@@ -10,6 +10,7 @@
     "build:watch": "tsc -w && cp src/*.json lib",
     "serve": "node ./lib/index.js",
     "dev:single": "npm run build && npm run serve",
+    "trace": "npm run build && node --inspect ./lib/index.js",
     "dev": "npm run build && concurrently \"npm run build:watch\" \"npm run serve\""
   },
   "keywords": [],
@@ -17,6 +18,7 @@
   "license": "ISC",
   "dependencies": {
     "dotenv": "^8.2.0",
+    "node-filter-async": "^2.0.0",
     "p-limit": "^3.0.2",
     "puppeteer": "^5.3.1",
     "string-similarity": "^4.0.2"

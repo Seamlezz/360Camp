@@ -2,6 +2,7 @@ import * as puppeteer from 'puppeteer'
 import * as similarity from 'string-similarity'
 import {getPage} from '.'
 import {clubs} from './clubs'
+import filterAsync from 'node-filter-async';
 
 export const readMatches = async () => {
     const matches = await Promise.all(
@@ -19,15 +20,22 @@ async function gatherData(startDate: string) {
     await page.goto(
         `https://www.phoenixhockey.nl/site/default.asp?org=100&option=100&SB_DatumWedstrijd=${startDate}`,
         {
-            waitUntil: 'networkidle0',
+            waitUntil: 'domcontentloaded',
         },
     )
 
     const lines = await page.$x(
-        '//*[contains(text(), "1 Rabobank veld") or contains(text(), "2 Muntstad veld")]/ancestor::tr[contains(@class, "even_wedstrijden") or contains(@class, "odd_wedstrijden")]',
+        '//*[contains(text(), "1 Rabobank veld") or contains(text(), "2 Broekhuis veld")]/ancestor::tr[contains(@class, "even_wedstrijden") or contains(@class, "odd_wedstrijden")]',
     )
 
-    const data = await Promise.all(lines.map((e) => mapRow(e, startDate)))
+    const filteredLines = await filterAsync(lines, async (e) => {
+        const line = await e.evaluate((element) => {
+            return element.querySelectorAll('td')[2].innerHTML
+        })
+        return !line.includes("Reservering")
+    })
+
+    const data = await Promise.all(filteredLines.map(e => mapRow(e, startDate)))
 
     await page.close()
 
@@ -35,24 +43,23 @@ async function gatherData(startDate: string) {
 }
 
 async function mapRow(
-    line: puppeteer.ElementHandle<Element>,
+    line: puppeteer.ElementHandle,
     startDate: string,
 ) {
-    const team = await line.evaluate((element) => {
-        return element.querySelectorAll('td')[0].children[0].children[0].innerHTML
-    })
-
-    const guestClub = await line.evaluate((element) => {
-        return element.querySelectorAll('td')[2].innerHTML
-    })
-
-    const isField1 = await line.evaluate((element) =>
-        element.innerHTML.includes('1 Rabobank veld'),
-    )
-
-    const startTime = await line.evaluate((element) => {
-        return element.querySelectorAll('td')[5].innerHTML
-    })
+    const [team, guestClub, isField1, startTime] = await Promise.all([
+        line.evaluate((element) => {
+            return element.querySelectorAll('td')[0].children[0].children[0].innerHTML
+        }),
+        line.evaluate((element) => {
+            return element.querySelectorAll('td')[2].innerHTML
+        }),
+        line.evaluate((element) =>
+            element.innerHTML.includes('1 Rabobank veld'),
+        ),
+        line.evaluate((element) => {
+            return element.querySelectorAll('td')[5].innerHTML
+        })
+    ])
 
     const guestInfo = getGuestClub(guestClub)
 
@@ -88,6 +95,13 @@ function getTeamName(team: string) {
 
 function getGuestClub(club: string) {
     let guestClub = club
+        .replace("Meisjes ", "M")
+        .replace('Senioren ', '')
+        .replace("Dames Jong ", "DJ")
+        .replace("Heren Jong ", "HJ")
+        .replace("Veterinnen ", "D30")
+        .replace("Veteranen ", "H35")
+        .replace(/(H\d{2})(\d{2}[A-Z])/g, "H$2")
     const lastIndex = guestClub.lastIndexOf(' ')
     const guestTeam = guestClub.substring(lastIndex).trim()
     guestClub = guestClub.substring(0, lastIndex)

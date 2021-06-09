@@ -1,7 +1,7 @@
 import * as puppeteer from 'puppeteer'
 import {readMatches} from './gather'
 import {login, planRecording} from "./plan";
-import * as pLimit from 'p-limit';
+import pLimit = require("p-limit");
 
 require('dotenv').config()
 
@@ -25,6 +25,8 @@ async function init() {
     browser = await puppeteer.launch({headless: false});
     const data = await readMatches();
 
+    console.table(data)
+
     const loginPage = await getPage();
     await loginPage.goto('https://app.360sportsintelligence.com', {
         waitUntil: 'networkidle0',
@@ -33,8 +35,9 @@ async function init() {
     await loginPage.close();
 
     const limit = pLimit(4);
-
     await Promise.all(data.map((d) => limit(() => planRecording(d))))
+
+    // await planRecording(data[0])
 
     await browser.close();
 }
