@@ -1,14 +1,21 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "CommonJS",
     "noImplicitReturns": true,
     "noUnusedLocals": true,
-    "lib": ["es6", "dom", "esnext"],
+    "esModuleInterop": true,
+    "lib": [
+      "es6",
+      "dom",
+      "esnext"
+    ],
     "outDir": "lib",
     "sourceMap": true,
     "strict": true,
-    "target": "es2017"
+    "target": "es2020"
   },
   "compileOnSave": true,
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

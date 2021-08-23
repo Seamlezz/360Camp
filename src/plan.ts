@@ -1,7 +1,9 @@
+import { MessageEmbed } from 'discord.js'
 import * as puppeteer from 'puppeteer'
-import {getPage, INTEL_EMAIL, INTEL_PASS} from '.'
+import { getPage, INTEL_EMAIL, INTEL_PASS, sendEmbededMessage } from '.'
+import { DetectedMatch } from './detector'
 
-export const planRecording = async (data: any) => {
+export const planRecording = async (data: DetectedMatch) => {
     const page = await getPage()
 
     await page.goto('https://app.360sportsintelligence.com', {
@@ -10,11 +12,33 @@ export const planRecording = async (data: any) => {
 
     await page.waitForSelector('a[title="recording"]')
 
-    await createEvent(page, data)
-    await addTeam(page, data)
+    try {
+        await createEvent(page, data)
+        await addTeam(page, data)
+        await sendPlannedMessage(data)
+    } catch (error) {
+        console.error(error)
+        await sendFailedMessage(data)
+    }
 
     await page.close()
 }
+
+const sendPlannedMessage = (match: DetectedMatch) =>
+    sendEmbededMessage([new MessageEmbed()
+        .setColor('#87FD50')
+        .setTitle(`${match.team} - ${match.guestClub} ${match.guestTeam}`)
+        .setDescription(`Successfuly planned this match!`)
+        .setFooter(`${match.startDate} - ${match.startTime} (${match.field})`)
+    ])
+
+const sendFailedMessage = (match: DetectedMatch) =>
+    sendEmbededMessage([new MessageEmbed()
+        .setColor('#AD0000')
+        .setTitle(`${match.team} - ${match.guestClub} ${match.guestTeam}`)
+        .setDescription(`Failed to plan this match! ${match.oldRow}`)
+        .setFooter(`${match.startDate} - ${match.startTime} (${match.field})`)
+    ])
 
 export async function login(page: puppeteer.Page) {
     await page.type('input[type=email]', INTEL_EMAIL!)
@@ -22,7 +46,7 @@ export async function login(page: puppeteer.Page) {
 
     await Promise.all([
         page.click('input[type=submit]'),
-        page.waitForNavigation({waitUntil: 'networkidle2'}),
+        page.waitForNavigation({ waitUntil: 'networkidle2' }),
     ])
 }
 
@@ -57,19 +81,32 @@ async function createEvent(page: puppeteer.Page, data: any) {
 }
 
 async function addTeam(page: puppeteer.Page, data: any) {
-    const {team, guestClub, guestTeam} = data
+    const { team, guestClub, guestTeam } = data
 
     await page.click(`div[alt="Edit ${team} - ${guestClub} ${guestTeam}"]`)
 
-    const [label] = await page.$x(
-        `//span[contains(text(),'${team}')]/ancestor::div[contains(@class, 'panel-list')]/ancestor::div[@id='view-recording-tab']`,
-    )
-
-    if (!label) {
-        await page.type('input[name="query-teams"]', `${team}`)
-        await page.click(`#query-teams-${team.toLowerCase()}`)
-        await page.waitForXPath(
-            `//span[contains(text(),'${team}')]/ancestor::div[contains(@class, 'panel-list')]/ancestor::div[@id='view-recording-tab']`,
+    const selectTeam = async (t: any) => {
+        const [label] = await page.$x(
+            `//span[contains(text(),'${t}')]/ancestor::div[contains(@class, 'panel-list')]/ancestor::div[@id='view-recording-tab']`,
         )
+
+        if (!label) {
+            await page.type('input[name="query-teams"]', `${t}`)
+            const teamSelector = await page.$(`#query-teams-${t.toLowerCase()}`)
+            if (!teamSelector) {
+                console.log("Could not find team:", t)
+                return
+            }
+
+            await page.click(`#query-teams-${t.toLowerCase()}`)
+            await page.waitForXPath(
+                `//span[contains(text(),'${t}')]/ancestor::div[contains(@class, 'panel-list')]/ancestor::div[@id='view-recording-tab']`,
+            )
+        }
+    }
+
+    await selectTeam(team);
+    if (guestClub == "Phoenix") {
+        await selectTeam(guestTeam);
     }
 }

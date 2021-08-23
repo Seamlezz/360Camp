@@ -1,8 +1,21 @@
-import * as puppeteer from 'puppeteer'
-import * as similarity from 'string-similarity'
-import {getPage} from '.'
-import {clubs} from './clubs'
 import filterAsync from 'node-filter-async';
+import * as puppeteer from 'puppeteer';
+import * as similarity from 'string-similarity';
+import * as uuid from 'uuid';
+import { getPage } from '.';
+import { clubs } from './clubs';
+
+export type Match = {
+    id: string,
+    team: string;
+    duration: number;
+    field: number;
+    guestClub: string;
+    guestTeam: string;
+    startDate: string;
+    startTime: string;
+    oldRow: string;
+}
 
 export const readMatches = async () => {
     const matches = await Promise.all(
@@ -14,11 +27,13 @@ export const readMatches = async () => {
     return matches.reduce((acc, m) => acc.concat(m), []);
 }
 
-async function gatherData(startDate: string) {
+async function gatherData(startDate: string): Promise<Match[]> {
     const page = await getPage()
 
+    const url = `https://www.phoenixhockey.nl/site/default.asp?org=100&option=100&SB_DatumWedstrijd=${startDate}`
+    console.log("Checking url:", url)
     await page.goto(
-        `https://www.phoenixhockey.nl/site/default.asp?org=100&option=100&SB_DatumWedstrijd=${startDate}`,
+        url,
         {
             waitUntil: 'domcontentloaded',
         },
@@ -45,7 +60,7 @@ async function gatherData(startDate: string) {
 async function mapRow(
     line: puppeteer.ElementHandle,
     startDate: string,
-) {
+): Promise<Match> {
     const [team, guestClub, isField1, startTime] = await Promise.all([
         line.evaluate((element) => {
             return element.querySelectorAll('td')[0].children[0].children[0].innerHTML
@@ -64,6 +79,7 @@ async function mapRow(
     const guestInfo = getGuestClub(guestClub)
 
     return {
+        id: uuid.v4(),
         team: getTeamName(team),
         duration: 5400,
         field: isField1 ? 1 : 2,
@@ -71,6 +87,7 @@ async function mapRow(
         guestTeam: guestInfo.guestTeam,
         startDate: startDate,
         startTime: startTime,
+        oldRow: `${team} - ${guestClub}`
     }
 }
 
@@ -97,8 +114,9 @@ function getGuestClub(club: string) {
     let guestClub = club
         .replace("Meisjes ", "M")
         .replace('Senioren ', '')
-        .replace("Dames Jong ", "DJ")
-        .replace("Heren Jong ", "HJ")
+        .replace("Dames ", "D")
+        .replace("Heren ", "H")
+        .replace("Jong ", "J")
         .replace("Veterinnen ", "D30")
         .replace("Veteranen ", "H35")
         .replace(/(H\d{2})(\d{2}[A-Z])/g, "H$2")
