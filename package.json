@@ -6,7 +6,7 @@
   "typings": "src/index.d.ts",
   "scripts": {
     "lint": "eslint 'src/**/*'",
-    "build": "tsc",
+    "build": "tsc --build tsconfig.json",
     "serve": "node ./lib/index.js",
     "dev:readonly": "npm run build && npm run serve",
     "dev:all": "npm run build && npm run serve",
