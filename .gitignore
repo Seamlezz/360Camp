@@ -5,5 +5,5 @@ package-lock.json
 .env
 /dist
 /lib
+lib
 serviceAccountKey.json
-lib/detector.js
