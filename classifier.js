@@ -12,6 +12,7 @@ classifier.addDocument('JA1 - HGC JA1', 'correct')
 // Suspicious
 classifier.addDocument('MB2 - Phoenix onbekend', 'suspicious');
 classifier.addDocument('H1 - ', 'suspicious');
+classifier.addDocument('H3 - Wateringse Veld -', 'suspicious');
 
 // Train the classifier
 classifier.train();

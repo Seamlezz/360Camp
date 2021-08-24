@@ -4,12 +4,14 @@ import { Match } from "./gather";
 
 export type DetectedMatch = {
     state: DetectedState;
+    duplicatedMatch: string | null;
 } & Match;
 
 export type Recording = {
     startDate: Date;
     endDate: Date;
     field: number;
+    matchName: string;
 }
 
 export type DetectedState = State | "duplicate";
@@ -23,7 +25,7 @@ export async function detectDuplicates(matches: FilteredMatch[], page: Page): Pr
     const recordings = await checkAllTimeings(planned, page)
 
     return matches.map(match => {
-        if (match.state === 'ignore') return match
+        if (match.state === 'ignore') return { ...match, duplicatedMatch: null }
         const duration = match.duration
         const startDate = new Date(`${match.startDate} ${match.startTime}`)
         const endDate = new Date(startDate.getTime() + duration * 1000)
@@ -31,33 +33,36 @@ export async function detectDuplicates(matches: FilteredMatch[], page: Page): Pr
         for (const recording of recordings) {
             if (match.field !== recording.field) continue;
 
-            console.log(`Matching ${match.team} -`, startDate, endDate, recording.startDate, recording.endDate, startDate.getTime() >= recording.startDate.getTime() && startDate.getTime() <= recording.endDate.getTime(), recording.startDate.getTime() >= startDate.getTime() && recording.startDate.getTime() <= endDate.getTime())
-
             // Check if the start date of the match is between the start and end date of the recording
             if (startDate.getTime() >= recording.startDate.getTime() && startDate.getTime() <= recording.endDate.getTime()) {
                 return {
                     ...match,
-                    state: "duplicate"
+                    state: "duplicate",
+                    duplicatedMatch: recording.matchName,
                 }
             }
             // Check if the start date of the recording is between the start and end date of the match
             if (recording.startDate.getTime() >= startDate.getTime() && recording.startDate.getTime() <= endDate.getTime()) {
                 return {
                     ...match,
-                    state: "duplicate"
+                    state: "duplicate",
+                    duplicatedMatch: recording.matchName,
                 }
             }
         }
-        return match
+        return {
+            ...match,
+            duplicatedMatch: null,
+        }
     })
 }
 
-// Get all the dates from all the matches filtering out the duplicates
+// Get all the dates from all the matches, and return only one date per day
 // The result should be an array of dates strings
 function detectDates(matches: FilteredMatch[]) {
     const dates = matches.map(match => getDate(match))
 
-    return dates.filter(date => dates.indexOf(date) === dates.lastIndexOf(date))
+    return [...new Set(dates)]
 }
 
 // Get the date from the match
@@ -93,24 +98,16 @@ async function checkAllTimeings(panned: ElementHandle<Element>[], page: Page): P
 }
 
 async function checkTimeing(recording: ElementHandle<Element>, page: Page): Promise<Recording> {
-    console.log("Checking: ", (await recording.getProperty("textContent"))?.jsonValue<string>())
-
     const field = await getField(recording)
+    const matchName = await getMatchName(recording)
 
     // Get a child of the recording with the class "ic-edit". Then click this child
-    const edit = await recording.$x(`//div[contains(@class, "ic-edit")]`)
+    const edit = await recording.$x(`.//div[contains(@class, "ic-edit")]`)
     // Check if the child exists
     if (edit.length === 0) {
         throw new Error("Could not find the edit button")
     }
     await edit[0].click()
-
-    // Get the ancestor of the edit button with the class "recording". Then print the textContent of this element
-    
-
-    // Search on the page for the first element with the class "pane-content"
-    // Then get the first child of this element with the class "details"
-    // Then concatinate the text of all the children of this element
 
     const details = await page.$x(`//div[contains(@class, "pane-content")]//div[contains(@class, "details")]`)
     if (details.length === 0) {
@@ -127,13 +124,14 @@ async function checkTimeing(recording: ElementHandle<Element>, page: Page): Prom
     return {
         startDate,
         endDate,
-        field: field
+        field: field,
+        matchName
     }
 }
 
 async function getField(recording: ElementHandle<Element>): Promise<number> {
     // Get a child of the recording with the class "teams" the get the first child with the class "inner" then get the first span child of this child
-    const field = await recording.$x(`//div[contains(@class, "teams")]//div[contains(@class, "inner")]//span`)
+    const field = await recording.$x(`.//div[contains(@class, "teams")]//div[contains(@class, "inner")]//span`)
     // Check if the child exists
     if (field.length !== 0) {
         // Get the text of this field as a string
@@ -148,6 +146,19 @@ async function getField(recording: ElementHandle<Element>): Promise<number> {
         }
     }
     return -1
+}
+
+async function getMatchName(recording: ElementHandle<Element>): Promise<string> {
+    const field = await recording.$x(`.//div[contains(@class, "title")]//span`)
+    // Check if the child exists
+    if (field.length !== 0) {
+        // Get the text of this field as a string
+        const fieldText = await field[0].getProperty("textContent")
+        if (fieldText) {
+            return fieldText.jsonValue<string>()
+        }
+    }
+    return ""
 }
 
 function parseDates(textContent: string) {

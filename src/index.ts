@@ -1,9 +1,12 @@
+import { SlashCommandBuilder } from '@discordjs/builders';
+import { REST } from '@discordjs/rest';
+import { Routes } from 'discord-api-types/v9';
 import { Client, Intents, Message, MessageActionRow, MessageEmbed, TextChannel } from 'discord.js';
 import puppeteer from 'puppeteer';
 import wait from 'wait';
 import { detectDuplicates, DetectedMatch } from './detector';
 import { filterMatches } from './filter';
-import { readMatches } from './gather';
+import { Match, readMatches } from './gather';
 import { login, planRecording } from "./plan";
 const pLimit = require('p-limit');
 
@@ -16,11 +19,11 @@ export const MAX_CONCURRENT_REQUESTS = parseInt(process.env.MAX_CONCURRENT_REQUE
 
 export const CHANNEL_ID = "879005372000649226";
 
-if (INTEL_EMAIL === undefined || INTEL_PASS === undefined || DISCORD_CLIENT_TOKEN === undefined) {
+if (INTEL_EMAIL == undefined || INTEL_PASS == undefined || DISCORD_CLIENT_TOKEN == undefined) {
     throw new Error('The envirorment variables where not configured correctly')
 }
 
-export const client = new Client({ intents: [Intents.FLAGS.GUILDS] })
+export const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] })
 let browser: puppeteer.Browser
 
 export async function getPage() {
@@ -30,11 +33,12 @@ export async function getPage() {
     return page
 }
 
-async function init() {
-    await client.login(DISCORD_CLIENT_TOKEN)
+async function startSession() {
     await clearMessages()
+
     await sendStartingMessage()
-    browser = await puppeteer.launch({ headless: false });
+
+    browser = await puppeteer.launch({ headless: true });
     const data = await readMatches();
 
     const filtered = await filterMatches(data)
@@ -42,7 +46,6 @@ async function init() {
     if (filtered.some(m => m.finished == 'canceled')) {
         await sendCancelMessage()
         await browser.close();
-        client.destroy();
         return
     }
 
@@ -56,14 +59,7 @@ async function init() {
     const filteredDuplicates = await detectDuplicates(filtered, loginPage)
     await loginPage.close();
 
-    if (true) {
-        await sendCancelMessage()
-        await browser.close();
-        client.destroy();
-        return
-    }
-
-    await sendStartPlanningMessage()
+    await sendStartPlanningMessage(filteredDuplicates)
 
     const limit = pLimit(MAX_CONCURRENT_REQUESTS);
     await Promise.all(filteredDuplicates
@@ -76,11 +72,44 @@ async function init() {
 
     await browser.close();
     await sendFinishedMessage();
-    client.destroy();
+}
+
+const commands = [
+    new SlashCommandBuilder().setName('start').setDescription('Start a new planning session'),
+].map(c => c.toJSON())
+
+async function init() {
+    await client.login(DISCORD_CLIENT_TOKEN)
+    const rest = new REST({ version: '9' }).setToken(DISCORD_CLIENT_TOKEN!!);
+
+    const channel = await getChannel()
+    const guildId = channel.guild.id
+    const clientId = client.user?.id
+
+    if (clientId == undefined) {
+        throw new Error('The client id was not found')
+    }
+
+    await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands })
+
+    client.on('interactionCreate', async (i) => {
+        if (!i.isCommand()) return
+        if (i.channel?.id != CHANNEL_ID) return
+
+        const { commandName } = i
+        if (commandName == 'start') {
+            i.deferReply()
+            await startSession()
+        }
+    })
+
+    await clearMessages()
 }
 
 init().catch(err => {
     console.error(err)
+    browser?.close()
+    client.destroy()
     process.exit(1)
 });
 
@@ -108,12 +137,12 @@ const sendStartProccessingDuplicatesMessage = () =>
         .setDescription('Beep boop baap, starting to look for duplicates in!'),
     ])
 
-const sendStartPlanningMessage = () =>
+const sendStartPlanningMessage = (matches: DetectedMatch[]) =>
     sendEmbededMessage([new MessageEmbed()
         .setAuthor("Barry Smits", "https://cdn.discordapp.com/avatars/775035854560690216/84268d40b70416e32b4e658d711d6219.png?size=256")
         .setColor('#0099ff')
         .setTitle('Started To Plan')
-        .setDescription('Beep boop baap, starting to plan everyting in!'),
+        .setDescription(`Starting to plan **${matches.filter(m => m.state === 'run').length}**, ignoring **${matches.filter(m => m.state === 'ignore').length}**, and found **${matches.filter(m => m.state === 'duplicate').length}** duplicates`),
     ])
 
 const sendFinishedMessage = () =>
@@ -127,15 +156,15 @@ const sendFinishedMessage = () =>
 const sendDuplicateMessage = (match: DetectedMatch) =>
     sendEmbededMessage([new MessageEmbed()
         .setColor('#A16100')
-        .setTitle(`${match.team} - ${match.guestClub} ${match.guestTeam}`)
-        .setDescription('Found Duplicate match thus ignoring the planning')
+        .setTitle(title(match))
+        .setDescription(`Found Duplicate match thus ignoring the planning:\n**${match.duplicatedMatch}**`)
         .setFooter(`${match.startDate} - ${match.startTime} (${match.field})`)
     ])
 
 const sendIgnoredMessage = (match: DetectedMatch) =>
     sendEmbededMessage([new MessageEmbed()
         .setColor('#FF3434')
-        .setTitle(`${match.team} - ${match.guestClub} ${match.guestTeam}`)
+        .setTitle(title(match))
         .setDescription(`Ignored this match. Be sure to plan it in manualy: ${match.oldRow}`)
         .setFooter(`${match.startDate} - ${match.startTime} (${match.field})`)
     ])
@@ -151,11 +180,17 @@ export async function sendEmbededMessage(embeds: MessageEmbed[], components: Mes
 }
 
 async function clearMessages() {
-    const channel = await client.channels.fetch(CHANNEL_ID)
-    if (channel?.isText()) {
-        if (channel instanceof TextChannel) await channel.bulkDelete(100)
-        await wait(1500)
-        const messages = await channel.messages.fetch({ limit: 100 })
-        await Promise.all(messages.map(m => m.delete()))
-    }
+    const channel = await getChannel()
+    await channel.bulkDelete(100)
+    await wait(1500)
+    const messages = await channel.messages.fetch({ limit: 100 })
+    await Promise.all(messages.map(m => m.delete()))
 }
+
+export async function getChannel() {
+    const channel = await client.channels.fetch(CHANNEL_ID)
+    if (channel instanceof TextChannel) return channel
+    else throw new Error('Channel is not a text channel')
+}
+
+export const title = (match: Match) => `${match.team} - ${match.guestClub} ${match.guestTeam}`.trim()

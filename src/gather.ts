@@ -1,4 +1,3 @@
-import filterAsync from 'node-filter-async';
 import * as puppeteer from 'puppeteer';
 import * as similarity from 'string-similarity';
 import * as uuid from 'uuid';
@@ -43,14 +42,14 @@ async function gatherData(startDate: string): Promise<Match[]> {
         '//*[contains(text(), "1 Rabobank veld") or contains(text(), "2 Broekhuis veld")]/ancestor::tr[contains(@class, "even_wedstrijden") or contains(@class, "odd_wedstrijden")]',
     )
 
-    const filteredLines = await filterAsync(lines, async (e) => {
-        const line = await e.evaluate((element) => {
-            return element.querySelectorAll('td')[2].innerHTML
-        })
-        return !line.includes("Reservering")
-    })
+    // const filteredLines = await filterAsync(lines, async (e) => {
+    //     const line = await e.evaluate((element) => {
+    //         return element.querySelectorAll('td')[2].innerHTML
+    //     })
+    //     return !line.includes("Reservering")
+    // })
 
-    const data = await Promise.all(filteredLines.map(e => mapRow(e, startDate)))
+    const data = await Promise.all(lines.map(e => mapRow(e, startDate)))
 
     await page.close()
 

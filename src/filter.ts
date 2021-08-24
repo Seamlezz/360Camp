@@ -1,5 +1,5 @@
-import { ButtonInteraction, Interaction, Message, MessageActionRow, MessageButton, MessageEmbed } from "discord.js";
-import { client, sendEmbededMessage } from ".";
+import { ButtonInteraction, Interaction, Message, MessageActionRow, MessageButton, MessageEmbed, MessageSelectMenu } from "discord.js";
+import { getChannel, sendEmbededMessage, title } from ".";
 import { loadClassifier } from "./classifier";
 import { Match } from "./gather";
 
@@ -21,13 +21,17 @@ export type State = "run" | "ignore";
 // A state object that can either be 'run', 'ignore', suspicious', or 'undecided'.
 export type FilterState = State | "suspicious" | "undecided";
 
-// A function that takes a filtered match and sends a message to discord.
-async function sendMatchStateMessage(match: FilteringMatch, interaction: ButtonInteraction | null = null): Promise<FilteringMatch> {
-    const embed = new MessageEmbed()
+function createMatchEmbed(match: FilteringMatch): MessageEmbed {
+    return new MessageEmbed()
         .setColor(match.finished === 'canceled' ? '#810000' : match.state === 'run' ? '#27d948' : match.state === 'ignore' ? '#FA4D4D' : match.state === 'undecided' ? '#0099ff' : '#ff6f4f')
-        .setTitle(`${match.team} - ${match.guestClub} ${match.guestTeam}`)
+        .setTitle(title(match))
         .setDescription(`${match.oldRow}`)
         .setFooter(`${match.startDate} - ${match.startTime} (${match.field})`)
+}
+
+// A function that takes a filtered match and sends a message to discord.
+async function sendMatchStateMessage(match: FilteringMatch, interaction: ButtonInteraction | null = null): Promise<FilteringMatch> {
+    const embed = createMatchEmbed(match)
 
     const row = new MessageActionRow()
         .addComponents(new MessageButton()
@@ -40,6 +44,11 @@ async function sendMatchStateMessage(match: FilteringMatch, interaction: ButtonI
             .setStyle('SUCCESS')
             .setLabel('Run')
             .setDisabled(match.state === 'run' || match.finished !== false)
+        ).addComponents(new MessageButton()
+            .setCustomId(`modify-${match.id}`)
+            .setStyle('SECONDARY')
+            .setLabel('Modify')
+            .setDisabled(match.finished !== false)
         )
 
     if (interaction !== null) {
@@ -101,7 +110,21 @@ export function filterMatches(matches: Match[]): Promise<FilteredMatch[]> {
         const map = new Map<string, FilteringMatch>();
         let message: Message | null = null;
 
-        client.on('interactionCreate', (i) => onInteraction(i, map, message, res, rej))
+        const collector = (await getChannel()).createMessageComponentCollector({ time: 120 * 1000 })
+
+        collector.on('collect', i => onInteraction(i, map, message, (d) => {
+            collector.stop()
+            res(d)
+        }, (d) => {
+            collector.stop()
+            rej(d)
+        }))
+
+        collector.on('end', (_, reason) => {
+            if (reason == 'time') {
+                cancelRequest(map, null, message, res)
+            }
+        })
 
         for (const match of filteringMatch) {
             map.set(match.id, await sendMatchStateMessage(match));
@@ -138,26 +161,17 @@ async function onInteraction(
                         map.set(newMatch.id, await sendMatchStateMessage(newMatch, interaction))
                     }
                 }
-
-                const matches = [...map.values()]
-                if (matches.every(m => m.state === 'ignore' || m.state === 'run')) {
-                    await sendMatchMessage(matches, null, message)
+            } else if (interaction.customId.startsWith('modify-')) {
+                const matchId = interaction.customId.split('-').slice(1).join('-')
+                const match = map.get(matchId)
+                if (match != null) {
+                    const newMatch = await modifyMatch(match, interaction)
+                    map.set(matchId, await sendMatchStateMessage(newMatch))
                 }
-
             } else if (interaction.customId.startsWith('confirm-')) {
                 // Check if canceled, if so cancel all
                 if (interaction.customId === 'confirm-cancel') {
-                    const matches = [...map.values()]
-                    sendMatchMessage(matches.map(m => ({ ...m, state: 'ignore', finished: 'canceled', })), interaction)
-                    for (const [, match] of map) {
-                        const newMatch: FilteringMatch = {
-                            ...match,
-                            state: 'ignore',
-                            finished: 'canceled',
-                        }
-                        map.set(newMatch.id, await sendMatchStateMessage(newMatch))
-                    }
-                    res(matches.map(m => ({ ...m, state: 'ignore', finished: 'canceled', })))
+                    await cancelRequest(map, interaction, null, res);
                 } else if (interaction.customId === 'confirm-process') {
                     const matches = [...map.values()]
                     sendMatchMessage(matches.map(m => ({ ...m, state: 'run', finished: 'processed', })), interaction)
@@ -171,15 +185,128 @@ async function onInteraction(
                     res(matches.map(m => ({ ...m, state: m.state == 'run' ? 'run' : 'ignore', finished: 'processed', })))
                 }
             }
+            const matches = [...map.values()]
+            if (matches.every(m => m.state === 'ignore' || m.state === 'run')) {
+                await sendMatchMessage(matches, null, message)
+            }
         }
     } catch (e) {
         rej(e)
     }
 }
 
+async function cancelRequest(map: Map<string, FilteringMatch>, interaction: ButtonInteraction | null, message: Message | null, res: (value: FilteredMatch[] | PromiseLike<FilteredMatch[]>) => void) {
+    const matches = [...map.values()];
+    sendMatchMessage(matches.map(m => ({ ...m, state: 'ignore', finished: 'canceled', })), interaction, message);
+    for (const [, match] of map) {
+        const newMatch: FilteringMatch = {
+            ...match,
+            state: 'ignore',
+            finished: 'canceled',
+        };
+        map.set(newMatch.id, await sendMatchStateMessage(newMatch));
+    }
+    res(matches.map(m => ({ ...m, state: 'ignore', finished: 'canceled', })));
+}
+
+async function modifyMatch(match: FilteringMatch, interaction: ButtonInteraction): Promise<FilteringMatch> {
+    // Create a selection menu for the fields of the match. Capitalize the first letter of the label.
+    const row1 = new MessageActionRow()
+        .addComponents(new MessageSelectMenu()
+            .setCustomId('field-select')
+            .setPlaceholder('Select a field')
+            .setMinValues(1)
+            .addOptions(['team', 'guestClub', 'guestTeam', 'startDate', 'startTime'].map(f => ({
+                label: f[0].toUpperCase() + f.slice(1),
+                description: `Old value: ${match[f as keyof FilteringMatch]}`,
+                value: f,
+            })))
+        )
+
+    const row2 = new MessageActionRow()
+        .addComponents(new MessageButton()
+            .setCustomId('field-unknown')
+            .setStyle("SECONDARY")
+            .setLabel('Change to Unknown')
+        )
+
+    const embed = createMatchEmbed(match)
+
+    await interaction.update({ embeds: [embed], components: [row2, row1] })
+
+    return new Promise((res, rej) => {
+        const channel = interaction.channel
+        if (!channel) {
+            rej("Could not find channel")
+            return
+        }
+        let m: FilteringMatch = {
+            ...match,
+            state: 'run'
+        }
+        const collector = channel.createMessageComponentCollector({ time: 20000 });
+        collector.on('collect', async (i) => {
+            if (i.isSelectMenu()) {
+                if (i.customId === 'field-select') {
+                    i.deferUpdate()
+                    for (const value of i.values) {
+                        if (collector.ended) return
+                        collector.resetTimer()
+                        const newValue = await collectFieldValue(value, m[value as keyof FilteringMatch], i.message as Message)
+                        m = {
+                            ...m,
+                            [value]: newValue,
+                        }
+                    }
+                    if (collector.ended) return
+                    collector.stop()
+                }
+            }
+            if (i.isButton()) {
+                if (i.customId === 'field-unknown') {
+                    i.deferUpdate()
+                    m = {
+                        ...m,
+                        guestClub: 'Onbekend',
+                        guestTeam: '',
+                    }
+                    collector.stop()
+                }
+            }
+        })
+        collector.on('end', _ => res(m))
+    })
+}
+
+async function collectFieldValue(field: string, currentValue: any, message: Message): Promise<any> {
+    const embed = new MessageEmbed()
+        .setTitle(`Please enter the new value for ${field[0] + field.slice(1)}`)
+        .setDescription(`Current value: ${currentValue}`)
+        .setFooter('You have 15 seconds to reply')
+
+    await message.edit({ embeds: [embed], components: [] })
+
+    return new Promise((res, rej) => {
+        const channel = message.channel
+        if (!channel) {
+            rej("Could not find channel")
+            return
+        }
+        let value = currentValue
+
+        const collector = channel.createMessageCollector({ time: 15000, max: 1, filter: m => !m.author.bot });
+        collector.on('collect', (msg) => {
+            if (msg.content) {
+                value = msg.content
+                msg.delete()
+            }
+        })
+        collector.on('end', _ => res(value))
+    })
+}
 
 function preFilter(match: Match, classifier: any): FilteringMatch {
-    const name = `${match.team} - ${match.guestClub} ${match.guestTeam}`
+    const name = title(match)
     const classification: string = classifier.classify(name)
     const state = classification == 'suspicious' ? 'suspicious' : 'undecided'
     return {

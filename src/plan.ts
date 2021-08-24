@@ -1,6 +1,6 @@
 import { MessageEmbed } from 'discord.js'
 import * as puppeteer from 'puppeteer'
-import { getPage, INTEL_EMAIL, INTEL_PASS, sendEmbededMessage } from '.'
+import { getPage, INTEL_EMAIL, INTEL_PASS, sendEmbededMessage, title } from '.'
 import { DetectedMatch } from './detector'
 
 export const planRecording = async (data: DetectedMatch) => {
@@ -27,7 +27,7 @@ export const planRecording = async (data: DetectedMatch) => {
 const sendPlannedMessage = (match: DetectedMatch) =>
     sendEmbededMessage([new MessageEmbed()
         .setColor('#87FD50')
-        .setTitle(`${match.team} - ${match.guestClub} ${match.guestTeam}`)
+        .setTitle(title(match))
         .setDescription(`Successfuly planned this match!`)
         .setFooter(`${match.startDate} - ${match.startTime} (${match.field})`)
     ])
@@ -35,7 +35,7 @@ const sendPlannedMessage = (match: DetectedMatch) =>
 const sendFailedMessage = (match: DetectedMatch) =>
     sendEmbededMessage([new MessageEmbed()
         .setColor('#AD0000')
-        .setTitle(`${match.team} - ${match.guestClub} ${match.guestTeam}`)
+        .setTitle(title(match))
         .setDescription(`Failed to plan this match! ${match.oldRow}`)
         .setFooter(`${match.startDate} - ${match.startTime} (${match.field})`)
     ])
@@ -58,7 +58,7 @@ async function createEvent(page: puppeteer.Page, data: any) {
     await page.select('#duration', `${data.duration}`)
     const selectElem = await page.$('#recording_setup_id')
     if (selectElem !== null) await selectElem.type(`SV Phoenix ${data.field}`)
-    try {
+    if (data.guestClub !== 'Onbekend') try {
         await page.select('#guest_club', `${data.guestClub}`)
     } catch (error) {
         console.error(error)
