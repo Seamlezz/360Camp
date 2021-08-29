@@ -29,7 +29,7 @@ COPY package*.json ./
 COPY . .
 
 RUN npm install -g typescript
-RUN npm install
+RUN npm ci
 RUN npm run build
 
-CMD [ "node", "lib/index.js" ]
+CMD [ "npm", "run", "serve"]
