@@ -38,7 +38,11 @@ async function startSession() {
 
     await sendStartingMessage()
 
-    browser = await puppeteer.launch({ headless: true });
+    browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
     const data = await readMatches();
 
     const filtered = await filterMatches(data)
@@ -104,6 +108,7 @@ async function init() {
     })
 
     await clearMessages()
+    await sendWakeMessage()
 }
 
 init().catch(err => {
@@ -113,12 +118,20 @@ init().catch(err => {
     process.exit(1)
 });
 
-const sendStartingMessage = () =>
+const sendWakeMessage = () =>
     sendEmbededMessage([new MessageEmbed()
         .setAuthor("Barry Smits", "https://cdn.discordapp.com/avatars/775035854560690216/84268d40b70416e32b4e658d711d6219.png?size=256")
         .setColor('#0099ff')
         .setTitle('Waking Up!')
         .setDescription('I am starting to wake up. Lets get to work!'),
+    ])
+
+const sendStartingMessage = () =>
+    sendEmbededMessage([new MessageEmbed()
+        .setAuthor("Barry Smits", "https://cdn.discordapp.com/avatars/775035854560690216/84268d40b70416e32b4e658d711d6219.png?size=256")
+        .setColor('#0099ff')
+        .setTitle('Lets Go!')
+        .setDescription('I am getting all the dates!'),
     ])
 
 const sendCancelMessage = () =>
