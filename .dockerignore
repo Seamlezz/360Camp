@@ -3,3 +3,4 @@ npm-debug.log
 nodemon.json
 .env
 lib
+package-lock.json
