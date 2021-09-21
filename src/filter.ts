@@ -26,7 +26,7 @@ function createMatchEmbed(match: FilteringMatch): MessageEmbed {
         .setColor(match.finished === 'canceled' ? '#810000' : match.state === 'run' ? '#27d948' : match.state === 'ignore' ? '#FA4D4D' : match.state === 'undecided' ? '#0099ff' : '#ff6f4f')
         .setTitle(title(match))
         .setDescription(`${match.oldRow}`)
-        .setFooter(`${match.startDate} - ${match.startTime} (${match.field})`)
+        .setFooter(`${match.startDate} - ${match.startTime} (${match.field}) | ${match.duration}s`)
 }
 
 // A function that takes a filtered match and sends a message to discord.
@@ -244,7 +244,7 @@ async function modifyMatch(match: FilteringMatch, interaction: ButtonInteraction
             ...match,
             state: 'run'
         }
-        const collector = channel.createMessageComponentCollector({ time: 20000 });
+        const collector = channel.createMessageComponentCollector({ time: 35000 });
         collector.on('collect', async (i) => {
             if (i.isSelectMenu()) {
                 if (i.customId === 'field-select') {
@@ -282,7 +282,7 @@ async function collectFieldValue(field: string, currentValue: any, message: Mess
     const embed = new MessageEmbed()
         .setTitle(`Please enter the new value for ${field[0] + field.slice(1)}`)
         .setDescription(`Current value: ${currentValue}`)
-        .setFooter('You have 15 seconds to reply')
+        .setFooter('You have 30 seconds to reply')
 
     await message.edit({ embeds: [embed], components: [] })
 
@@ -294,7 +294,7 @@ async function collectFieldValue(field: string, currentValue: any, message: Mess
         }
         let value = currentValue
 
-        const collector = channel.createMessageCollector({ time: 15000, max: 1, filter: m => !m.author.bot });
+        const collector = channel.createMessageCollector({ time: 30000, max: 1, filter: m => !m.author.bot });
         collector.on('collect', (msg) => {
             if (msg.content) {
                 value = msg.content
