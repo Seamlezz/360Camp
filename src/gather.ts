@@ -80,7 +80,7 @@ async function mapRow(
     return {
         id: uuid.v4(),
         team: getTeamName(team),
-        duration: 5400,
+        duration: 100 * 60,
         field: isField1 ? 1 : 2,
         guestClub: guestInfo.guestClub,
         guestTeam: guestInfo.guestTeam,

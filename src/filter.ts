@@ -110,7 +110,7 @@ export function filterMatches(matches: Match[]): Promise<FilteredMatch[]> {
         const map = new Map<string, FilteringMatch>();
         let message: Message | null = null;
 
-        const collector = (await getChannel()).createMessageComponentCollector({ time: 120 * 1000 })
+        const collector = (await getChannel()).createMessageComponentCollector({ time: 20 * 60 * 1000 })
 
         collector.on('collect', i => onInteraction(i, map, message, (d) => {
             collector.stop()
