@@ -123,7 +123,8 @@ const sendWakeMessage = () =>
         .setAuthor("Barry Smits", "https://cdn.discordapp.com/avatars/775035854560690216/84268d40b70416e32b4e658d711d6219.png?size=256")
         .setColor('#0099ff')
         .setTitle('Waking Up!')
-        .setDescription('I am starting to wake up. Lets get to work!'),
+        .setDescription('I am starting to wake up. Lets get to work!')
+        .setFooter(`Version: ${require('../package.json').version}`),
     ])
 
 const sendStartingMessage = () =>
