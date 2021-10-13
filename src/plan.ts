@@ -1,7 +1,7 @@
-import { MessageEmbed } from 'discord.js'
+import {MessageEmbed} from 'discord.js'
 import * as puppeteer from 'puppeteer'
-import { getPage, INTEL_EMAIL, INTEL_PASS, sendEmbededMessage, title } from '.'
-import { DetectedMatch } from './detector'
+import {errors, getPage, INTEL_EMAIL, INTEL_PASS, sendEmbededMessage, title} from '.'
+import {DetectedMatch} from './detector'
 
 export const planRecording = async (data: DetectedMatch) => {
     const page = await getPage()
@@ -18,6 +18,7 @@ export const planRecording = async (data: DetectedMatch) => {
         await sendPlannedMessage(data)
     } catch (error) {
         console.error(error)
+        errors.report(error)
         await sendFailedMessage(data)
     }
 
@@ -46,7 +47,7 @@ export async function login(page: puppeteer.Page) {
 
     await Promise.all([
         page.click('input[type=submit]'),
-        page.waitForNavigation({ waitUntil: 'networkidle2' }),
+        page.waitForNavigation({waitUntil: 'networkidle2'}),
     ])
 }
 
@@ -62,6 +63,7 @@ async function createEvent(page: puppeteer.Page, data: any) {
         await page.select('#guest_club', `${data.guestClub}`)
     } catch (error) {
         console.error(error)
+        errors.report(error)
     }
 
     const [liveCheck] = await page.$x(`//span[contains(text(),'Start livestream during recording')]`)
@@ -81,9 +83,9 @@ async function createEvent(page: puppeteer.Page, data: any) {
 }
 
 async function addTeam(page: puppeteer.Page, data: any) {
-    const { team, guestClub, guestTeam } = data
+    const {team, guestClub, guestTeam} = data
 
-    await page.click(`div[alt="Edit ${team} - ${guestClub} ${guestTeam}"]`)
+    await page.click(`div[title="Edit ${team} - ${guestClub} ${guestTeam}"]`)
 
     const selectTeam = async (t: any) => {
         const [label] = await page.$x(
