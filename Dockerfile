@@ -1,5 +1,5 @@
 FROM node:16
-LABEL name "camp360"
+LABEL name = "camp360"
 
 WORKDIR /usr/src/app
 
