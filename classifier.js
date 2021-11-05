@@ -10,6 +10,8 @@ classifier.addDocument('MA1 - Voordaan MA1', 'correct')
 classifier.addDocument('JA1 - HGC JA1', 'correct')
 classifier.addDocument('MB3 - Phoenix MB3', 'correct')
 classifier.addDocument('H3 - Naarden H2', 'correct')
+classifier.addDocument('MB2 - Spandersbosch MB2', 'correct')
+classifier.addDocument('H3 - Leonidas H7', 'correct')
 
 // Suspicious
 classifier.addDocument('MB2 - Phoenix onbekend', 'suspicious');

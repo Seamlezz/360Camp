@@ -82,6 +82,11 @@ async function sendMatchMessage(matches: FilteringMatch[], interaction: ButtonIn
             .setStyle('DANGER')
             .setLabel('Cancel All')
             .setDisabled(isFinished)
+            // ).addComponents(new MessageButton()
+            //     .setCustomId(`confirm-ignore-rest`)
+            //     .setStyle('SECONDARY')
+            //     .setLabel('Ignore Rest')
+            //     .setDisabled(isFinished)
         ).addComponents(new MessageButton()
             .setCustomId(`confirm-process`)
             .setStyle('SUCCESS')
@@ -172,6 +177,8 @@ async function onInteraction(
                 // Check if canceled, if so cancel all
                 if (interaction.customId === 'confirm-cancel') {
                     await cancelRequest(map, interaction, null, res);
+                } else if (interaction.customId === 'confirm-ignore-rest') {
+                    // await ingoreRestRequest(map, interaction, null, res);
                 } else if (interaction.customId === 'confirm-process') {
                     const matches = [...map.values()]
                     sendMatchMessage(matches.map(m => ({ ...m, state: 'run', finished: 'processed', })), interaction)
@@ -208,6 +215,21 @@ async function cancelRequest(map: Map<string, FilteringMatch>, interaction: Butt
     }
     res(matches.map(m => ({ ...m, state: 'ignore', finished: 'canceled', })));
 }
+
+// Changes all the states that are not 'run' to 'ignore'
+// async function ingoreRestRequest(map: Map<string, FilteringMatch>, interaction: ButtonInteraction | null, message: Message | null, res: (value: FilteredMatch[] | PromiseLike<FilteredMatch[]>) => void) {
+//     const matches = [...map.values()];
+
+//     sendMatchMessage(matches.map(m => ({ ...m, state: m.state === 'run' ? m.state : "ignore" })), interaction, message);
+//     for (const [, match] of map) {
+//         const newMatch: FilteringMatch = {
+//             ...match,
+//             state: match.state === 'run' ? match.state : "ignore",
+//         };
+//         map.set(newMatch.id, await sendMatchStateMessage(newMatch));
+//     }
+//     res(matches.map(m => ({ ...m, state: m.state === 'run' ? m.state : "ignore", finished: 'processed', })));
+// }
 
 async function modifyMatch(match: FilteringMatch, interaction: ButtonInteraction): Promise<FilteringMatch> {
     // Create a selection menu for the fields of the match. Capitalize the first letter of the label.

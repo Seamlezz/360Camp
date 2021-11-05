@@ -1,7 +1,7 @@
-import {MessageEmbed} from 'discord.js'
+import { MessageEmbed } from 'discord.js'
 import * as puppeteer from 'puppeteer'
-import {errors, getPage, INTEL_EMAIL, INTEL_PASS, sendEmbededMessage, title} from '.'
-import {DetectedMatch} from './detector'
+import { errors, getPage, INTEL_EMAIL, INTEL_PASS, sendEmbededMessage, title } from '.'
+import { DetectedMatch } from './detector'
 
 export const planRecording = async (data: DetectedMatch) => {
     const page = await getPage()
@@ -47,7 +47,7 @@ export async function login(page: puppeteer.Page) {
 
     await Promise.all([
         page.click('input[type=submit]'),
-        page.waitForNavigation({waitUntil: 'networkidle2'}),
+        page.waitForNavigation({ waitUntil: 'networkidle2' }),
     ])
 }
 
@@ -83,7 +83,7 @@ async function createEvent(page: puppeteer.Page, data: any) {
 }
 
 async function addTeam(page: puppeteer.Page, data: any) {
-    const {team, guestClub, guestTeam} = data
+    const { team, guestClub, guestTeam } = data
 
     await page.click(`div[title="Edit ${team} - ${guestClub} ${guestTeam}"]`)
 
@@ -97,6 +97,7 @@ async function addTeam(page: puppeteer.Page, data: any) {
             const teamSelector = await page.$(`#query-teams-${t.toLowerCase()}`)
             if (!teamSelector) {
                 console.log("Could not find team:", t)
+                errors.report(new Error(`Could not find team: ${t}`))
                 return
             }
 

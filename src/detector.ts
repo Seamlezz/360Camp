@@ -77,7 +77,9 @@ function getDate(match: FilteredMatch) {
 
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-    return months[parseInt(month) - 1] + " " + day
+    const parsedDay = parseInt(day)
+
+    return `${months[parseInt(month) - 1]} ${parsedDay}`
 }
 
 // Search on the page for all recordings with a date

@@ -1,14 +1,14 @@
-import {SlashCommandBuilder} from '@discordjs/builders';
-import {REST} from '@discordjs/rest';
-import {Routes} from 'discord-api-types/v9';
-import {Client, Intents, Message, MessageActionRow, MessageEmbed, TextChannel} from 'discord.js';
+import { SlashCommandBuilder } from '@discordjs/builders';
+import { REST } from '@discordjs/rest';
+import { ErrorReporting } from "@google-cloud/error-reporting";
+import { Routes } from 'discord-api-types/v9';
+import { Client, Intents, Message, MessageActionRow, MessageEmbed, TextChannel } from 'discord.js';
 import puppeteer from 'puppeteer';
 import wait from 'wait';
-import {detectDuplicates, DetectedMatch} from './detector';
-import {filterMatches} from './filter';
-import {Match, readMatches} from './gather';
-import {login, planRecording} from "./plan";
-import {ErrorReporting} from "@google-cloud/error-reporting";
+import { detectDuplicates, DetectedMatch } from './detector';
+import { filterMatches } from './filter';
+import { Match, readMatches } from './gather';
+import { login, planRecording } from "./plan";
 
 const pLimit = require('p-limit');
 
@@ -26,12 +26,12 @@ if (INTEL_EMAIL == undefined || INTEL_PASS == undefined || DISCORD_CLIENT_TOKEN 
 }
 
 export const errors = new ErrorReporting();
-export const client = new Client({intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES]})
+export const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] })
 let browser: puppeteer.Browser
 
 export async function getPage() {
     const page = await browser.newPage()
-    await page.setViewport({width: 1200, height: 720})
+    await page.setViewport({ width: 1200, height: 720 })
 
     return page
 }
@@ -93,7 +93,7 @@ const commands = [
 
 async function init() {
     await client.login(DISCORD_CLIENT_TOKEN)
-    const rest = new REST({version: '9'}).setToken(DISCORD_CLIENT_TOKEN!!);
+    const rest = new REST({ version: '9' }).setToken(DISCORD_CLIENT_TOKEN!!);
 
     const channel = await getChannel()
     const guildId = channel.guild.id
@@ -103,13 +103,13 @@ async function init() {
         throw new Error('The client id was not found')
     }
 
-    await rest.put(Routes.applicationGuildCommands(clientId, guildId), {body: commands})
+    await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands })
 
     client.on('interactionCreate', async (i) => {
         if (!i.isCommand()) return
         if (i.channel?.id != CHANNEL_ID) return
 
-        const {commandName} = i
+        const { commandName } = i
         if (commandName == 'start') {
             i.deferReply()
             await startSession()
@@ -206,15 +206,20 @@ export async function sendEmbededMessage(embeds: MessageEmbed[], components: Mes
         throw new Error('Channel not found')
     }
     if (channel.isText()) {
-        return await channel.send({embeds: embeds, components: components})
+        return await channel.send({ embeds: embeds, components: components })
     } else throw new Error('Channel is not a text channel')
 }
 
 async function clearMessages() {
     const channel = await getChannel()
-    await channel.bulkDelete(100)
+    try {
+        await channel.bulkDelete(100)
+    } catch (e) {
+        console.error(e)
+        errors.report(e)
+    }
     await wait(1500)
-    const messages = await channel.messages.fetch({limit: 100})
+    const messages = await channel.messages.fetch({ limit: 100 })
     await Promise.all(messages.map(m => m.delete()))
 }
 
