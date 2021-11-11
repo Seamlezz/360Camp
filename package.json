@@ -7,9 +7,8 @@
   "scripts": {
     "lint": "eslint 'src/**/*'",
     "build": "tsc --build tsconfig.json",
-    "serve": "node ./lib/index.js",
-    "dev:readonly": "npm run build && npm run serve",
-    "dev:all": "npm run build && npm run serve",
+    "serve": "node ./lib/src/index.js",
+    "dev": "npm run build && npm run serve",
     "train": "node classifier.js"
   },
   "keywords": [],

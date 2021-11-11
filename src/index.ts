@@ -133,7 +133,7 @@ const sendWakeMessage = () =>
         .setColor('#0099ff')
         .setTitle('Waking Up!')
         .setDescription('I am starting to wake up. Lets get to work!')
-        .setFooter(`Version: ${require('../package.json').version}`),
+        .setFooter(`Version: ${require('../../package.json').version}`),
     ])
 
 const sendStartingMessage = () =>

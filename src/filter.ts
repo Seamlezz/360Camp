@@ -72,9 +72,9 @@ async function sendMatchMessage(matches: FilteringMatch[], interaction: ButtonIn
     const isProcessed = matches.some(m => m.finished === 'processed')
 
     const embed = new MessageEmbed()
-        .setColor(isProcessed ? "#38FF74" : isCanceled ? "#810000" : '#E838FF')
+        .setColor(isProcessed ? "#38FF74" : isCanceled ? "#810000" : '#8438FF')
         .setTitle(`Confirm Matches`)
-        .setDescription(`When all the matches are ready, confirm to process`)
+        .setDescription(`When all the matches are ready, confirm to process. Or just ignore the rest`)
 
     const row = new MessageActionRow()
         .addComponents(new MessageButton()
@@ -82,11 +82,11 @@ async function sendMatchMessage(matches: FilteringMatch[], interaction: ButtonIn
             .setStyle('DANGER')
             .setLabel('Cancel All')
             .setDisabled(isFinished)
-            // ).addComponents(new MessageButton()
-            //     .setCustomId(`confirm-ignore-rest`)
-            //     .setStyle('SECONDARY')
-            //     .setLabel('Ignore Rest')
-            //     .setDisabled(isFinished)
+        ).addComponents(new MessageButton()
+            .setCustomId(`confirm-ignore-rest`)
+            .setStyle('SECONDARY')
+            .setLabel('Ignore Rest')
+            .setDisabled(isFinished || matches.some(m => m.state === 'run'))
         ).addComponents(new MessageButton()
             .setCustomId(`confirm-process`)
             .setStyle('SUCCESS')
@@ -178,7 +178,7 @@ async function onInteraction(
                 if (interaction.customId === 'confirm-cancel') {
                     await cancelRequest(map, interaction, null, res);
                 } else if (interaction.customId === 'confirm-ignore-rest') {
-                    // await ingoreRestRequest(map, interaction, null, res);
+                    await ingoreRestRequest(map, interaction, null, res);
                 } else if (interaction.customId === 'confirm-process') {
                     const matches = [...map.values()]
                     sendMatchMessage(matches.map(m => ({ ...m, state: 'run', finished: 'processed', })), interaction)
@@ -217,19 +217,19 @@ async function cancelRequest(map: Map<string, FilteringMatch>, interaction: Butt
 }
 
 // Changes all the states that are not 'run' to 'ignore'
-// async function ingoreRestRequest(map: Map<string, FilteringMatch>, interaction: ButtonInteraction | null, message: Message | null, res: (value: FilteredMatch[] | PromiseLike<FilteredMatch[]>) => void) {
-//     const matches = [...map.values()];
-
-//     sendMatchMessage(matches.map(m => ({ ...m, state: m.state === 'run' ? m.state : "ignore" })), interaction, message);
-//     for (const [, match] of map) {
-//         const newMatch: FilteringMatch = {
-//             ...match,
-//             state: match.state === 'run' ? match.state : "ignore",
-//         };
-//         map.set(newMatch.id, await sendMatchStateMessage(newMatch));
-//     }
-//     res(matches.map(m => ({ ...m, state: m.state === 'run' ? m.state : "ignore", finished: 'processed', })));
-// }
+async function ingoreRestRequest(map: Map<string, FilteringMatch>, interaction: ButtonInteraction | null, message: Message | null, res: (value: FilteredMatch[] | PromiseLike<FilteredMatch[]>) => void) {
+    const matches = [...map.values()]
+    sendMatchMessage(matches.map(m => ({ ...m, state: 'run', finished: 'processed', })), interaction)
+    for (const [, match] of map) {
+        const newMatch: FilteringMatch = {
+            ...match,
+            state: match.state == 'run' ? 'run' : 'ignore',
+            finished: 'processed',
+        }
+        map.set(newMatch.id, await sendMatchStateMessage(newMatch))
+    }
+    res(matches.map(m => ({ ...m, state: m.state == 'run' ? 'run' : 'ignore', finished: 'processed', })))
+}
 
 async function modifyMatch(match: FilteringMatch, interaction: ButtonInteraction): Promise<FilteringMatch> {
     // Create a selection menu for the fields of the match. Capitalize the first letter of the label.

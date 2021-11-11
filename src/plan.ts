@@ -94,14 +94,16 @@ async function addTeam(page: puppeteer.Page, data: any) {
 
         if (!label) {
             await page.type('input[name="query-teams"]', `${t}`)
-            const teamSelector = await page.$(`#query-teams-${t.toLowerCase()}`)
+            // Get the team selector by the id wich is `#query-teams-${t.toLowerCase()}`
+            // Use page xpath to get the selector
+            const [teamSelector] = await page.$x(`//a[@id="query-teams-${t.toLowerCase()}"]`)
             if (!teamSelector) {
                 console.log("Could not find team:", t)
                 errors.report(new Error(`Could not find team: ${t}`))
                 return
             }
 
-            await page.click(`#query-teams-${t.toLowerCase()}`)
+            await teamSelector.click()
             await page.waitForXPath(
                 `//span[contains(text(),'${t}')]/ancestor::div[contains(@class, 'panel-list')]/ancestor::div[@id='view-recording-tab']`,
             )
@@ -109,7 +111,9 @@ async function addTeam(page: puppeteer.Page, data: any) {
     }
 
     await selectTeam(team);
+    await selectTeam(`Phoenix ${team}`);
     if (guestClub == "Phoenix") {
         await selectTeam(guestTeam);
+        await selectTeam(`Phoenix ${guestTeam}`);
     }
 }
