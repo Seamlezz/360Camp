@@ -66,7 +66,7 @@ async function createEvent(page: puppeteer.Page, data: any) {
         errors.report(error)
     }
 
-    const [liveCheck] = await page.$x(`//span[contains(text(),'Start livestream during recording')]`)
+    const [liveCheck] = await page.$x(`//span[contains(text(),'Start YouTube livestream during recording')]`)
 
     if (liveCheck) {
         await liveCheck.click()
