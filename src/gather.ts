@@ -1,8 +1,8 @@
 import * as puppeteer from 'puppeteer';
 import * as similarity from 'string-similarity';
 import * as uuid from 'uuid';
-import { getPage } from '.';
-import { clubs } from './clubs';
+import {getPage} from '.';
+import {clubs} from './clubs';
 
 export type Match = {
     id: string,
@@ -109,9 +109,10 @@ function getTeamName(team: string) {
     return `${teamConsonants}${teamId}`.toUpperCase()
 }
 
-function getGuestClub(club: string) {
+export function getGuestClub(club: string) {
     let guestClub = club
         .replace("Meisjes ", "M")
+        .replace("Jongens ", "J")
         .replace('Senioren ', '')
         .replace("Dames ", "D")
         .replace("Heren ", "H")
@@ -130,7 +131,7 @@ function getGuestClub(club: string) {
         .replace('Club', '')
         .replace('Hockey', '')
         .replace('Vereniging', '')
-        .replace(/(\&amp\;)/g, '')
+        .replace(/(&amp;)/g, '')
         .replace(/(\w*)(se )/g, '$1')
         .replace('!Oefenwedstrijd', '')
         .trim()
