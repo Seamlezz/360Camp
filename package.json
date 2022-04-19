@@ -9,7 +9,8 @@
     "build": "tsc --build tsconfig.json",
     "serve": "node ./lib/src/index.js",
     "dev": "npm run build && npm run serve",
-    "train": "node classifier.js"
+    "train": "node classifier.js",
+    "start": "npm run dev"
   },
   "keywords": [],
   "author": "",
