@@ -25,7 +25,9 @@ if (INTEL_EMAIL == undefined || INTEL_PASS == undefined || DISCORD_CLIENT_TOKEN 
     throw new Error('The envirorment variables where not configured correctly')
 }
 
-export const errors = new ErrorReporting();
+export const errors = new ErrorReporting({
+    reportMode: 'always',
+});
 export const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] })
 let browser: puppeteer.Browser
 
